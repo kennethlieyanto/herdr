@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+PROJECT_DIR="${1:-$PWD}"
+
+TAB1_JSON=$(herdr tab create --cwd "$PROJECT_DIR" --label "opencode")
+PANE1_ID=$(echo "$TAB1_JSON" | jq -r '.result.root_pane.pane_id')
+herdr pane run "$PANE1_ID" "opencode"
+
+TAB2_JSON=$(herdr tab create --cwd "$PROJECT_DIR" --label "nvim")
+PANE2_ID=$(echo "$TAB2_JSON" | jq -r '.result.root_pane.pane_id')
+herdr pane run "$PANE2_ID" "nvim"
+
+herdr tab create --cwd "$PROJECT_DIR" --label "shell"
+
+TAB4_JSON=$(herdr tab create --cwd "$PROJECT_DIR" --label "lazygit")
+PANE4_ID=$(echo "$TAB4_JSON" | jq -r '.result.root_pane.pane_id')
+herdr pane run "$PANE4_ID" "lazygit"
+
+TAB5_JSON=$(herdr tab create --cwd "$PROJECT_DIR" --label "hunk-diff")
+PANE5_ID=$(echo "$TAB5_JSON" | jq -r '.result.root_pane.pane_id')
+herdr pane run "$PANE5_ID" "hunk diff"
