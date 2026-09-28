@@ -1,0 +1,36 @@
+onboarding = false
+
+[ui]
+agent_panel_scope = "all"
+
+[keys]
+prefix = "ctrl+a"
+switch_tab = "alt+1..9"
+switch_workspace = "prefix+1..9"
+focus_agent = "alt+shift+1..9"
+split_vertical = ["prefix+v", "prefix+%"]
+split_horizontal = ["prefix+minus", "prefix+\""]
+workspace_picker = "prefix+s"
+goto = "prefix+w"
+settings = "prefix+shift+s"
+reload_config = "prefix+r"
+resize_mode = "prefix+shift+r"
+resize_pane_left = "prefix+ctrl+h"
+resize_pane_down = "prefix+ctrl+j"
+resize_pane_up = "prefix+ctrl+k"
+resize_pane_right = "prefix+ctrl+l"
+move_tab_previous = "prefix+<"
+move_tab_next = "prefix+>"
+last_pane = "prefix+shift+l"
+swap_pane_right = "prefix+alt+l"
+toggle_sidebar = "prefix+e"
+edit_scrollback = "prefix+shift+e"
+
+[[keys.command]]
+key = "prefix+t"
+type = "pane"
+command = "herdr-setup"
+description = "herdr new custom setup"
+
+[theme]
+name = "vesper"
