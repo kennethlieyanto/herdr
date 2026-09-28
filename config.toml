@@ -4,6 +4,9 @@ onboarding = false
 agent_panel_scope = "all"
 host_cursor = "native"
 
+[ui.toast]
+delivery = "system"
+
 [keys]
 prefix = "ctrl+a"
 switch_tab = "alt+1..9"
@@ -12,7 +15,7 @@ focus_agent = "alt+shift+1..9"
 split_vertical = ["prefix+v", "prefix+%"]
 split_horizontal = ["prefix+minus", "prefix+\""]
 workspace_picker = "prefix+s"
-goto = ["prefix+w", "ctrl+f"]
+goto = ["prefix+w"]
 settings = "prefix+shift+s"
 reload_config = "prefix+r"
 resize_mode = "prefix+shift+r"
