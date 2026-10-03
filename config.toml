@@ -5,7 +5,7 @@ agent_panel_scope = "all"
 host_cursor = "native"
 
 [ui.toast]
-delivery = "system"
+delivery = "terminal"
 
 [keys]
 prefix = "ctrl+a"
