@@ -2,3 +2,4 @@
 /herdr-server.log
 /release-notes.json
 /session.json
+.env
