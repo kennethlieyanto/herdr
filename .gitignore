@@ -3,3 +3,6 @@
 /release-notes.json
 /session.json
 .env
+/session-snapshots
+/herdr.sock.agent
+/.plugins.lock
