@@ -15,7 +15,7 @@ switch_workspace = "prefix+1..9"
 focus_agent = "alt+shift+1..9"
 split_vertical = ["prefix+v", "prefix+%"]
 split_horizontal = ["prefix+minus", "prefix+\""]
-goto = ["prefix+s"]
+goto = ""
 workspace_picker = "prefix+w"
 settings = "prefix+shift+s"
 reload_config = "prefix+r"
@@ -33,12 +33,39 @@ rename_tab = "prefix+,"
 rename_workspace = "prefix+$"
 detach = "prefix+d"
 last_pane = "prefix+L"
+next_tab = ""
+
+[[keys.command]]
+key = "prefix+n"
+type = "popup"
+command = "herdr-task-picker worktree"
+description = "taskwarrior task -> worktree workspace"
+width = "90%"
+height = "90%"
 
 [[keys.command]]
 key = "prefix+t"
-type = "pane"
-command = "herdr-setup"
-description = "herdr new custom setup"
+type = "popup"
+command = "herdr-task-picker tab"
+description = "taskwarrior task -> tab"
+width = "90%"
+height = "90%"
+
+[[keys.command]]
+key = "prefix+s"
+type = "popup"
+command = "herdr-workspace-picker"
+description = "switch herdr workspace"
+width = "90%"
+height = "90%"
+
+[[keys.command]]
+key = "prefix+a"
+type = "popup"
+command = "herdr-agent-picker"
+description = "focus herdr agent"
+width = "90%"
+height = "90%"
 
 [theme]
 name = "vesper"

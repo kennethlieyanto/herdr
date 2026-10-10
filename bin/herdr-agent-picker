@@ -1,0 +1,62 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+HERDR_BIN="${HERDR_BIN_PATH:-herdr}"
+
+notify() {
+  "$HERDR_BIN" notification show "agent picker" --body "$1" >/dev/null 2>&1 || true
+}
+
+die() {
+  notify "$1"
+  printf '%s\n' "$1" >&2
+  sleep 2
+  exit 1
+}
+
+agent_json=$("$HERDR_BIN" agent list) || die "cannot query herdr agents"
+tab_json=$("$HERDR_BIN" tab list) || die "cannot query herdr tabs"
+ws_json=$("$HERDR_BIN" workspace list) || die "cannot query herdr workspaces"
+pane_json=$("$HERDR_BIN" pane list) || die "cannot query herdr panes"
+
+declare -A ws_label tab_label ws_number
+
+while IFS=$'\t' read -r id label number; do
+  ws_label["$id"]=$label
+  ws_number["$id"]=$number
+done < <(printf '%s' "$ws_json" | jq -r '.result.workspaces[] | [.workspace_id, .label, (.number | tostring)] | @tsv')
+
+while IFS=$'\t' read -r tid label; do
+  tab_label["$tid"]=$label
+done < <(printf '%s' "$tab_json" | jq -r '.result.tabs[] | [.tab_id, .label] | @tsv')
+
+focused_pane=$(printf '%s' "$pane_json" | jq -r '.result.panes[] | select(.focused == true) | .pane_id' | head -n1)
+
+selection=$(
+  printf '%s' "$agent_json" | jq -r '.result.agents[] | [.pane_id, .agent, .workspace_id, .tab_id] | @tsv' \
+    | while IFS=$'\t' read -r pid agent wid tid; do
+        wlabel=${ws_label[$wid]:-$wid}
+        tlabel=${tab_label[$tid]:-$tid}
+
+        display="$wlabel - $agent - $tlabel"
+
+        if [ "$pid" = "$focused_pane" ]; then
+          mark="* "
+          curflag=0
+        else
+          mark="  "
+          curflag=1
+        fi
+
+        printf '%s.%s.%s\t%s%s\t%s\n' "$curflag" "${ws_number[$wid]:-0}" "$agent" "$mark" "$display" "$pid"
+      done \
+    | sort -t$'\t' -k1,1V \
+    | fzf --delimiter='\t' --with-nth=2 --reverse --height=100% \
+        --prompt='agent> ' \
+        --header='focus herdr agent'
+) || true
+
+[ -z "${selection:-}" ] && exit 0
+
+pid=$(printf '%s' "$selection" | cut -f3)
+"$HERDR_BIN" agent focus "$pid" >/dev/null 2>&1 || true

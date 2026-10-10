@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+MODE="${1:-worktree}"
+
+HERDR_BIN="${HERDR_BIN_PATH:-herdr}"
+TASK_BIN="${TASK_BIN:-task}"
+export TASK_BIN
+
+notify() {
+  "$HERDR_BIN" notification show "task picker" --body "$1" >/dev/null 2>&1 || true
+}
+
+die() {
+  notify "$1"
+  printf '%s\n' "$1" >&2
+  sleep 2
+  exit 1
+}
+
+slugify() {
+  printf '%s' "$1" \
+    | tr '[:upper:]' '[:lower:]' \
+    | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//' \
+    | cut -c1-60 \
+    | sed -E 's/-+$//'
+}
+
+cwd="${HERDR_ACTIVE_PANE_CWD:-$PWD}"
+
+ctx=$( "$TASK_BIN" _get rc.context 2>/dev/null || true )
+ctx_filter=()
+if [ -n "$ctx" ]; then
+  read -r -a ctx_filter <<< "$( "$TASK_BIN" _get "rc.context.${ctx}.read" 2>/dev/null || true )" || true
+fi
+
+selection=$(
+  "$TASK_BIN" status:pending limit:0 "${ctx_filter[@]}" export \
+    | jq -r '.[] | [(.id | tostring), (.project // "-"), .description] | @tsv' \
+    | fzf --delimiter='\t' --with-nth=3 \
+        --reverse --height=100% \
+        --prompt='task> ' \
+        --header='select a taskwarrior task' \
+        --preview='"$TASK_BIN" {1} info' \
+        --preview-window='right,55%'
+) || true
+
+[ -z "${selection:-}" ] && exit 0
+
+task_id=$(printf '%s' "$selection" | cut -f1)
+desc=$(printf '%s' "$selection" | cut -f3)
+
+slug=$(slugify "$desc")
+[ -z "$slug" ] && slug="task-$task_id"
+
+start_task() {
+  "$TASK_BIN" "$task_id" start >/dev/null 2>&1 || true
+}
+
+launch_opencode() {
+  local pane="$1"
+  [ -z "$pane" ] && return 0
+  sleep 0.4
+  "$HERDR_BIN" pane run "$pane" opencode >/dev/null 2>&1 || true
+}
+
+if [ "$MODE" = "tab" ]; then
+  ws="${HERDR_ACTIVE_WORKSPACE_ID:-}"
+  [ -z "$ws" ] && die "no active herdr workspace"
+
+  existing=$(
+    "$HERDR_BIN" tab list --workspace "$ws" \
+      | jq -r --arg l "$slug" '.result.tabs[] | select(.label == $l) | .tab_id' \
+      | head -n1
+  ) || true
+
+  if [ -n "$existing" ]; then
+    "$HERDR_BIN" tab focus "$existing" >/dev/null
+    start_task
+    exit 0
+  fi
+
+  resp=$("$HERDR_BIN" tab create --workspace "$ws" --cwd "$cwd" --label "$slug" --focus)
+  pane=$(printf '%s' "$resp" | jq -r '.result.root_pane.pane_id // empty')
+  start_task
+  launch_opencode "$pane"
+  exit 0
+fi
+
+common=$(git -C "$cwd" rev-parse --path-format=absolute --git-common-dir 2>/dev/null) \
+  || die "not inside a git repository: $cwd"
+repo_root=$(dirname "$common")
+
+base=$(git -C "$repo_root" symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's@^origin/@@') || true
+base=${base:-main}
+
+existing=$(
+  "$HERDR_BIN" worktree list --cwd "$repo_root" \
+    | jq -r --arg b "$slug" '.result.worktrees[] | select(.branch == $b) | [(.open_workspace_id // ""), .path] | @tsv' \
+    | head -n1
+) || true
+
+if [ -n "$existing" ]; then
+  ws_id=$(printf '%s' "$existing" | cut -f1)
+  if [ -n "$ws_id" ]; then
+    "$HERDR_BIN" workspace focus "$ws_id" >/dev/null
+  else
+    "$HERDR_BIN" worktree open --cwd "$repo_root" --branch "$slug" --label "$slug" --focus >/dev/null
+  fi
+  start_task
+  exit 0
+fi
+
+resp=$("$HERDR_BIN" worktree create --cwd "$repo_root" --branch "$slug" --base "$base" --label "$slug" --focus)
+pane=$(printf '%s' "$resp" | jq -r '.result.root_pane.pane_id // empty')
+start_task
+launch_opencode "$pane"

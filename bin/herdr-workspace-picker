@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+HERDR_BIN="${HERDR_BIN_PATH:-herdr}"
+
+notify() {
+  "$HERDR_BIN" notification show "workspace picker" --body "$1" >/dev/null 2>&1 || true
+}
+
+die() {
+  notify "$1"
+  printf '%s\n' "$1" >&2
+  sleep 2
+  exit 1
+}
+
+ws_json=$("$HERDR_BIN" workspace list) || die "cannot query herdr workspaces"
+pane_json=$("$HERDR_BIN" pane list) || die "cannot query herdr panes"
+
+declare -A tab_min_pane tab_cwd branch_cache
+
+while IFS=$'\t' read -r tid pid cwd; do
+  existing=${tab_min_pane[$tid]:-}
+  if [ -z "$existing" ]; then
+    tab_min_pane["$tid"]=$pid
+    tab_cwd["$tid"]=$cwd
+  else
+    n1=${existing##*p}
+    n2=${pid##*p}
+    if [ "$n2" -lt "$n1" ]; then
+      tab_min_pane["$tid"]=$pid
+      tab_cwd["$tid"]=$cwd
+    fi
+  fi
+done < <(printf '%s' "$pane_json" | jq -r '.result.panes[] | [.tab_id, .pane_id, (.cwd // "")] | @tsv')
+
+branch_for() {
+  local cwd="$1" b
+  [ -z "$cwd" ] && return 0
+  if [ -n "${branch_cache[$cwd]+x}" ]; then
+    printf '%s' "${branch_cache[$cwd]}"
+    return 0
+  fi
+  b=$(git -C "$cwd" symbolic-ref --short HEAD 2>/dev/null || true)
+  if [ -z "$b" ]; then
+    b=$(git -C "$cwd" rev-parse --short HEAD 2>/dev/null || true)
+    [ -n "$b" ] && b="detached@$b"
+  fi
+  branch_cache["$cwd"]="$b"
+  printf '%s' "$b"
+}
+
+selection=$(
+  printf '%s' "$ws_json" | jq -r '.result.workspaces[] | [.workspace_id, .label, (.number | tostring), (.focused | tostring), .active_tab_id] | @tsv' \
+    | while IFS=$'\t' read -r wid label number focused active; do
+        cwd=${tab_cwd[$active]:-}
+        branch=$(branch_for "$cwd")
+
+        display="$label"
+        [ -n "$branch" ] && display="$display - $branch"
+
+        if [ "$focused" = "true" ]; then
+          mark="* "
+          curflag=0
+        else
+          mark="  "
+          curflag=1
+        fi
+
+        printf '%s.%s\t%s%s\t%s\n' "$curflag" "$number" "$mark" "$display" "$wid"
+      done \
+    | sort -t$'\t' -k1,1V \
+    | fzf --delimiter='\t' --with-nth=2 --reverse --height=100% \
+        --prompt='workspace> ' \
+        --header='switch herdr workspace'
+) || true
+
+[ -z "${selection:-}" ] && exit 0
+
+wid=$(printf '%s' "$selection" | cut -f3)
+"$HERDR_BIN" workspace focus "$wid" >/dev/null 2>&1 || true
